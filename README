@@ -1,0 +1,60 @@
+Archivo README para el projecto marbles
+
+Realizado por: Julio Castillo 0234745
+	       Cesar Romero   0235409
+
+Este archivo tiene como objetivo explicar brevemente el proceso de
+compilacion, ejecucion y uso de la aplicacion.
+
+1. COMPILACION: Para compilar en Linux solo es necesario hace make en
+el direcorio raiz de la aplicacion.
+
+[user@host ~/path/to/aplication]$ make
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o model.o model.c
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o view.o view.c
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o input.o input.c
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o material.o material.c
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o marble.o marble.c
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o texto.o texto.c
+gcc -Wall -pipe -O3 -fomit-frame-pointer -march=pentium4   -c -o main.o main.c
+gcc  model.o view.o input.o material.o marble.o texto.o main.o -lglut -lGL -lGLU -lX11 -lm -lSDL -lpthread  -o marbles
+
+Si la salida de su compilacion es similar a la anterior, la aplicacion
+fue compilada con exito
+
+
+2. EJECUCION: Solo es necesario ejecutar el archivo que lleva por
+nombre marbles (como lo indica la compilacion)
+
+$ ./marbles
+
+
+3. USO: Definimos a continuacion el conjunto de teclas que permiten
+interactuar con la aplicacion tanto en modo edicion como en modo
+juego:
+
+MODO EDICION
+TECLA(S)	ACCION
+q		Salir de modo edicion
+flechas		Moverse sobre los puntos de control
+PG_UP		Subir punto de control seleccionado
+PG_DOWN		Bajar punto de control seleccionado
+
+MODO JUEGO
+TECLA(S)	ACCION
+e		Entrar en modo edicion
+flechas 	Ajustar angulo de disparo
+SPACEBAR	Disparar metra
+
+CUALQIUER MODO
+TECLA(S)	ACCION
+j		Mostrar/Esconder eje de coordenadas
+w		Cambiar entre wireframe y fill para mostrar la superficie y las metras
+x,X		Mover camara en eje X
+y,Y		Mover camara en eje Y
+z,Z		Mover camara en eje Z
+
+EXTRAS:
+De los elementos considerados como extras se implementaron las
+texturas para las metras y la modificacion del terreno de juego con el
+mouse

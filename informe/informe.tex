@@ -1,0 +1,202 @@
+\documentclass[10pt,letterpaper]{article}
+
+\usepackage{listings}
+\lstloadlanguages{[ANSI]C}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[spanish,activeacute]{babel}
+\usepackage{setspace}
+\onehalfspacing
+
+\author{Julio Castillo \ 02-34745\\C\'esar Romero 02-35409}
+\title{CI4321\\Marbles: Reporte T\'ecnico}
+
+\begin{document}
+\maketitle{}
+\section{OpenGL}
+Para la implementaci'on de este juego era esencial utilizar una
+superficie de B'ezier que representa el terreno de juego sobre el
+cual se mueven las metras. OpenGL se encarga de hacer los c'alculos
+necesarios para dibujar la superficie incluyendo todas sus normales de
+manera que la interacci'on con la luz sea correcta. Esto simplifica
+parte importante de la implementaci'on. Con s'olo especificar los
+puntos de control podemos crear una superficie y modificarla.
+
+La otra parte importante en la implementaci'on del juego la
+constituyen las metras, su interacci'on con la superficie y con otras
+metras. A pesar de que la evaluaci'on de la superficie es realizada en
+su totalidad por OpenGL, no es posible para los programadores tener
+acceso a los valores de esta funci'on. Esto nos lleva a la necesidad
+de tener que hacer estos c'alculos por separado, lo que sugiere que
+realmente se est'an realizando algunas cuentas dos veces.
+
+Tanto la evaluaci'on de la superficie como de la normal son realizados
+en nuestra implementaci'on y ser'an explicados a continuaci'on.
+
+\section{B'ezier-Spline}
+Para modelar el comportamiento de las metras sobre el terreno de juego
+es necesario evaluar constantemente la superficie de B'ezier para
+obtener la ``altura'' a la que van a ser dibujadas. La superficie
+est'a definida en funci'on de un conjunto de $(n+1)(m+1)$ puntos de
+control. La f'ormula para la superficie~\cite{angel} recibe como par'ametro puntos
+de un cuadrado unitario $(u,v) \in [0,1]^2$
+\[
+p(u,v)=\sum_{i=0}^n\sum_{j=0}^mB_i^n(u)B_j^m(v)k_{ij}
+\]
+donde
+\[
+B_i^n(u)={n\choose i}u^i(1-u)^{n-i}
+\]
+es un polinomio de Bernstein.
+
+Adicionalmente es necesario calcular el vector normal al plano en un
+punto $(u_0,v_0)$. Para esto tomamos un par de puntos con diferencia
+$0.5$ en $x$ y $z$ respectivamente, construimos dos vectores que van
+desde el punto sobre la superficie hacia cada uno de estos puntos y
+con el producto cruz de estos obtenemos el vector normal.
+
+No es dif'icil ver que el vector resultante no es de magnitud 1. Es
+mas, la magnitud de este vector resultante es directamente
+proporcional a la inclinaci'on de la superficie en el 'area cercana al
+punto considerado. Esto nos da un modelo simple que permite tomar las
+componentes del vector resultante como valores que definen la
+velocidad de la metra en cualquier momento que no ocurra una colisi'on.
+
+Para poder conocer la posici'on de una metra en un instante de tiempo
+$t$ es necesario terminar de definir el modelo. Tenemos todav'ia tres
+posibles escenarios por definir. Primero, si no hay colisi'on la
+velocidad resultante de la metra se calcula usando tanto la velocidad
+actual como la velocidad en un instante de tiempo previo
+$V=0.85*(V_0+V_1)$, donde $V_0$ y $V_1$ representan la velocidad de la
+metra en el instante $t-\Delta t$ y $t$, respectivamente. N'otese que
+esto hace que la metra acelere si se encuentra en una superficie inclinada y
+que desacelere si se encuentra en una plana. Segundo, si la metra $M_i$
+choca con $M_j$, se intercambian las velocidades de las metras:
+$V_{Mi},V_{Mj}:=V_{Mj},V_{Mi}$.
+
+Por 'ultimo, para describir el choque con la ``pared invisible''\ que
+delimita el terreno de juego simplemente cambiabos el signo del
+componente en $X$ o $Z$, si la metra llega a un l'imite en $X$ o $Z$
+repectivamente, y lo multiplicamos por $0.5$ para simular la p'erdida
+de energ'ia.
+\[
+V_{x(z)}=
+\begin{cases}
+-0.5\times V_{x(z)} & \text{si }|M_{x(z)}| > 5\\
+V_{x(z)}            &\text{si } |M_{x(z)}| < 5\\
+\end{cases}
+\]
+\section{Estructuras de Datos}
+Se utilizaron dos estructuras de datos principales. La primera y m'as
+importante representa el modelo completo del juego. Una instancia de
+esta estructura se maneja durante toda la corrida del programa. A
+continuaci'on, su definici'on:
+\lstset{language=[ANSI]C,tabsize=2}
+\begin{lstlisting}
+
+  typedef struct {
+    
+    int editando;             // estamos editando?
+    int editx;                // punto de edicion
+    int edity;
+
+    int gridsize;             // resolucion
+
+    GLfloat puntos[11][11][3];// puntos de control
+
+    GLfloat camx, camy;       // angulo de la camara en x, y
+    GLfloat camz;             // distancia de la camara al centro
+    GLfloat camaperture;      // apertura de la camara
+
+    int winw;                 // anchura de la ventana
+    int winh;                 // altura de la ventana
+
+    int wireframe;            // fill o wireframe
+
+    float objx, objy, objz;   // posicion de la metra objetivo
+    int ronda;                // ronda del juego
+    int over;                 // game over?
+
+    int ejes;                 // dibujar ejes?
+    
+    int players;              // numero de jugadores
+    int turn;                 // jugador de turno
+    marble_t marble[4];       // maximo 4 jugadorese
+
+    int still;                // no hay metras moviendose
+    int wait_still;    // esperando para empezar el proximo turno
+
+
+  } model_t;
+
+\end{lstlisting}
+
+Como vemos, parte de nuestro modelo est'a constituido por un arreglo de
+\verb|marble_t| que contiene la informaci'on de todas las metras en el
+terreno de juego. La segunda estructura es precisamente la que define
+las metras y todas las caracteristicas que sean requeridas para
+representarlas correctamente. Se define de la siguiente manera:
+\begin{lstlisting}
+
+  typedef struct{
+
+    float x,y,z;  // posicion de la metra
+    float r;      // radio 
+
+    float vx;     // velocidad en X
+    float vz;     // velocidad en Z
+
+    float nx;     // componente en X del vector normal
+    float ny;     // componente en Y
+    float nz;     // componente en Z
+
+    material_t material;
+
+    GLUquadricObj *q;
+    GLuint texture;
+
+    GLfloat rotx;  // rotacion en X
+    GLfloat rotz;  // rotacion en Z
+
+    GLfloat theta; // angulo del disparar (en radianes)
+    GLfloat mag;   // magnitud del vector de fuerza de disparo
+
+  } marble_t;
+
+\end{lstlisting}
+\section{Juego}
+Se implement'o un juego de metras donde el objetivo del jugador es
+acercar su metra lo mas posible a una esfera peque'na de color negro
+que es colocada en una posici'on aleatoria del terreno del juego antes
+de iniciar la partida. Cada jugador tendra dos turnos en los cuales
+puede acercarse y alejar a sus contendientes del objetivo, pero el
+objetivo siempre permanece en la misma posici'on.
+
+El terreno de juego es inicialmente plano pero puede ser editado en
+cualquier momento durante la partida
+\section{Problemas enfrentados}
+El primer problema de importancia que enfrentamos durante la
+implementaci'on de este juego fue con la evaluaci'on de la superficie
+para poder dibujar las metras en el lugar adecuado. Al implementar la
+f'ormula que define el B'ezier-Spline, decidimos inicialmente usar de
+referencia el Red Book de OpenGL\cite{redbook}. En la explicaci'on de
+la f'ormula que define la superficie encontramos un error relacionado
+con el n'umero de puntos de control utilizados en el c'alculo. El
+problema fue resuelto luego de consultar otras fuentes entre las
+cuales se encuentra la Wikipedia\cite{wikibezier}.
+
+Otro problema importante fue con el dibujado del spline. Encontramos
+que al correr nuestro juego en tarjetas NVIDIA el spline s'olo se
+dibuja correctamente cuando tomamos un n'umero de puntos de control
+menor o igual a 64. Lamentablemente este problema no pudo ser
+resuelto. En todas las tarjetas gr'aficas de otras marcas que fueron
+probadas, el juego corri'o sin problemas.
+
+\begin{thebibliography}{99}
+\bibitem{redbook} Jackie Neider, Tom Davis, and Mason Woo. OpenGL
+  Programming Guide. Addison-Wesley.
+\bibitem{wikibezier} \verb|http://en.wikipedia.org/wiki/B'ezier_surface|
+\bibitem{angel}Edward Angel. Interactive Computer Graphics. Addison-Wesley Longman Publishing Co., Inc. Boston, MA, USA. 2002
+\end{thebibliography}
+\end{document}
